@@ -1,9 +1,9 @@
-name: Weekly Quiz Update
+name: Auto Update Quiz Every 2 Days
 
 on:
   schedule:
-    # 每周一北京时间早上 8 点运行（UTC 0 点）
-    - cron: '0 0 * * 1'
+    # 每2天运行一次（UTC 2点 = 北京时间上午10点）
+    - cron: '0 2 */2 * *'
   workflow_dispatch:
 
 permissions:
@@ -18,27 +18,53 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - name: Update quiz date
+      - name: Install dependencies
         run: |
-          # 更新 HTML 中的更新日期标记（可根据需要扩展为自动抓取时政新闻）
-          CURRENT_DATE=$(date +%Y-%m-%d)
-          echo "Current update date: $CURRENT_DATE"
-          # 此处可接入自动爬虫或 API 获取最新时政并生成新题目
-          # 目前仅更新页面元信息，实际题目更新需要人工审核后提交
+          pip install -r scripts/requirements.txt
+
+      - name: Run auto update script
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          python scripts/auto_update.py
+
+      - name: Check if questions updated
+        id: check_update
+        run: |
+          if git diff --quiet index.html; then
+            echo "updated=false" >> $GITHUB_OUTPUT
+            echo "没有新题目需要更新"
+          else
+            echo "updated=true" >> $GITHUB_OUTPUT
+            echo "检测到新题目，准备提交"
+          fi
+
+      - name: Commit and push changes
+        if: steps.check_update.outputs.updated == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "auto: update quiz questions $(date +%Y-%m-%d)"
+          git push
 
       - name: Configure GitHub Pages
+        if: steps.check_update.outputs.updated == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
+        if: steps.check_update.outputs.updated == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages
+        if: steps.check_update.outputs.updated == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
