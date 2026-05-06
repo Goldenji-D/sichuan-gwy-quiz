@@ -1,0 +1,44 @@
+name: Weekly Quiz Update
+
+on:
+  schedule:
+    # 每周一北京时间早上 8 点运行（UTC 0 点）
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Update quiz date
+        run: |
+          # 更新 HTML 中的更新日期标记（可根据需要扩展为自动抓取时政新闻）
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          echo "Current update date: $CURRENT_DATE"
+          # 此处可接入自动爬虫或 API 获取最新时政并生成新题目
+          # 目前仅更新页面元信息，实际题目更新需要人工审核后提交
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
